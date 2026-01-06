@@ -1,6 +1,6 @@
 import request from 'supertest';
 import express from 'express';
-import { healthRouter } from '../server/src/routes/health';
+import { healthRouter } from '../routes/health';
 
 // テスト用Expressアプリ作成
 const app = express();

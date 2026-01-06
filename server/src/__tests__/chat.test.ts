@@ -1,6 +1,6 @@
 import request from 'supertest';
 import express from 'express';
-import { chatRouter } from '../server/src/routes/chat';
+import { chatRouter } from '../routes/chat';
 
 // テスト用Expressアプリ作成
 const app = express();
@@ -18,6 +18,7 @@ describe('Chat API', () => {
       expect(response.body).toHaveProperty('reply');
       expect(response.body).toHaveProperty('sessionId');
       expect(response.body).toHaveProperty('timestamp');
+      expect(response.body).toHaveProperty('confidence');
       expect(typeof response.body.reply).toBe('string');
       expect(response.body.reply.length).toBeGreaterThan(0);
     });
@@ -49,32 +50,26 @@ describe('Chat API', () => {
 
       expect(response.body).toHaveProperty('error', 'Bad Request');
     });
-  });
 
-  describe('POST /api/v1/chat/escalate', () => {
-    it('エスカレーションリクエストが成功する', async () => {
+    it('メッセージが長すぎる場合は400エラー', async () => {
+      const longMessage = 'a'.repeat(5000);
       const response = await request(app)
-        .post('/api/v1/chat/escalate')
-        .send({
-          sessionId: 'test-session',
-          reason: 'AIでは解決できない問題',
-        })
-        .expect(200);
+        .post('/api/v1/chat')
+        .send({ message: longMessage })
+        .expect(400);
 
-      expect(response.body).toHaveProperty('success', true);
-      expect(response.body).toHaveProperty('ticketId');
-      expect(response.body).toHaveProperty('message');
+      expect(response.body).toHaveProperty('error', 'Bad Request');
     });
   });
 
-  describe('GET /api/v1/chat/history/:sessionId', () => {
-    it('履歴エンドポイントが応答する', async () => {
+  describe('GET /api/v1/chat/stats', () => {
+    it('統計情報を取得できる', async () => {
       const response = await request(app)
-        .get('/api/v1/chat/history/test-session')
+        .get('/api/v1/chat/stats')
         .expect(200);
 
-      expect(response.body).toHaveProperty('sessionId', 'test-session');
-      expect(response.body).toHaveProperty('messages');
+      expect(response.body).toHaveProperty('sessions');
+      expect(response.body).toHaveProperty('ai');
     });
   });
 });

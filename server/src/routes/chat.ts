@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AIService } from '../services/aiService';
+import { sessionService } from '../services/sessionService';
 import { logger } from '../utils/logger';
 import { ChatRequest, ChatResponse } from '../types/chat';
 
@@ -14,35 +15,66 @@ chatRouter.post('/', async (req: Request, res: Response) => {
     const { message, sessionId, tenantId } = req.body as ChatRequest;
 
     // バリデーション
-    if (!message || typeof message !== 'string') {
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
       res.status(400).json({
         error: 'Bad Request',
-        message: 'message field is required and must be a string',
+        message: 'message field is required and must be a non-empty string',
       });
       return;
     }
 
-    // セッションIDがなければ生成
-    const currentSessionId = sessionId || uuidv4();
+    // メッセージ長制限（4000文字）
+    if (message.length > 4000) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Message too long. Maximum 4000 characters allowed.',
+      });
+      return;
+    }
+
+    // セッション取得または作成
+    const session = sessionService.getOrCreateSession(
+      sessionId,
+      tenantId || 'default'
+    );
 
     logger.info('Processing chat request', {
-      sessionId: currentSessionId,
-      tenantId: tenantId || 'default',
+      sessionId: session.id,
+      tenantId: session.tenantId,
       messageLength: message.length,
+      historyLength: session.messages.length,
     });
 
+    // ユーザーメッセージを履歴に追加
+    sessionService.addMessage(session.id, 'user', message);
+
+    // AI用コンテキスト構築
+    const context = sessionService.buildAIContext(session);
+
     // AI応答を取得
-    const reply = await aiService.generateResponse(message, {
-      sessionId: currentSessionId,
-      tenantId: tenantId || 'default',
-    });
+    const reply = await aiService.generateResponse(message, context);
+
+    // AI応答を履歴に追加
+    sessionService.addMessage(session.id, 'assistant', reply);
+
+    // 信頼度計算
+    const confidence = aiService.calculateConfidence(reply, []);
+
+    // エスカレーション判定
+    const shouldEscalate = aiService.shouldEscalate(message, reply, confidence);
 
     const response: ChatResponse = {
       reply,
-      sessionId: currentSessionId,
+      sessionId: session.id,
       timestamp: new Date().toISOString(),
-      confidence: 0.85, // TODO: 実際の信頼度計算を実装
+      confidence,
+      escalated: shouldEscalate,
     };
+
+    // エスカレーション推奨の場合はメッセージに追記
+    if (shouldEscalate && !reply.includes('オペレーター')) {
+      response.reply += '\n\n※ご希望でしたら、人間のオペレーターにおつなぎすることも可能です。';
+    }
 
     res.json(response);
   } catch (error) {
@@ -54,15 +86,27 @@ chatRouter.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// 会話履歴取得（将来実装）
+// 会話履歴取得
 chatRouter.get('/history/:sessionId', (req: Request, res: Response) => {
   const { sessionId } = req.params;
 
-  // TODO: データベースから履歴を取得
+  const session = sessionService.getSession(sessionId);
+
+  if (!session) {
+    res.status(404).json({
+      error: 'Not Found',
+      message: 'Session not found or expired',
+    });
+    return;
+  }
+
   res.json({
-    sessionId,
-    messages: [],
-    message: 'History retrieval not yet implemented',
+    sessionId: session.id,
+    tenantId: session.tenantId,
+    messages: session.messages,
+    status: session.status,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
   });
 });
 
@@ -70,17 +114,89 @@ chatRouter.get('/history/:sessionId', (req: Request, res: Response) => {
 chatRouter.post('/escalate', (req: Request, res: Response) => {
   const { sessionId, reason } = req.body;
 
-  logger.info('Escalation requested', { sessionId, reason });
+  if (!sessionId) {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: 'sessionId is required',
+    });
+    return;
+  }
 
-  // TODO: 実際のエスカレーション処理を実装
-  // - チケット作成
-  // - 通知送信
-  // - 会話ログ保存
+  const session = sessionService.getSession(sessionId);
+
+  if (!session) {
+    res.status(404).json({
+      error: 'Not Found',
+      message: 'Session not found or expired',
+    });
+    return;
+  }
+
+  logger.info('Escalation requested', {
+    sessionId,
+    reason,
+    messageCount: session.messages.length,
+  });
+
+  // セッションステータスを更新
+  sessionService.updateSessionStatus(sessionId, 'escalated');
+
+  // システムメッセージを追加
+  sessionService.addMessage(
+    sessionId,
+    'assistant',
+    `ご要望を承りました。人間のオペレーターへおつなぎします。\n理由: ${reason || '指定なし'}`
+  );
 
   res.json({
     success: true,
     message: 'Your request has been escalated to a human agent',
     ticketId: uuidv4(),
     estimatedWaitTime: '5-10 minutes',
+    conversationSummary: {
+      messageCount: session.messages.length,
+      sessionDuration: calculateSessionDuration(session.createdAt),
+    },
   });
 });
+
+// セッション終了
+chatRouter.post('/close', (req: Request, res: Response) => {
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: 'sessionId is required',
+    });
+    return;
+  }
+
+  sessionService.closeSession(sessionId);
+
+  res.json({
+    success: true,
+    message: 'Session closed successfully',
+  });
+});
+
+// セッション統計（管理用）
+chatRouter.get('/stats', (_req: Request, res: Response) => {
+  const stats = sessionService.getStats();
+  const providerInfo = aiService.getProviderInfo();
+
+  res.json({
+    sessions: stats,
+    ai: providerInfo,
+  });
+});
+
+// セッション継続時間計算
+function calculateSessionDuration(createdAt: string): string {
+  const start = new Date(createdAt).getTime();
+  const now = Date.now();
+  const durationMs = now - start;
+  const minutes = Math.floor(durationMs / 60000);
+  const seconds = Math.floor((durationMs % 60000) / 1000);
+  return `${minutes}分${seconds}秒`;
+}
