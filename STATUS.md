@@ -1,4 +1,4 @@
-﻿# SupportGenieAI - ステータス
+﻿﻿# SupportGenieAI - ステータス
 
 最終更新: 2026-01-07
 
