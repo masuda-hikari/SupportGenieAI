@@ -1,4 +1,4 @@
-﻿﻿# SupportGenieAI - タスク管理
+﻿﻿﻿# SupportGenieAI - タスク管理
 
 ## 待機中タスク
 <!-- 新しいタスクをここに追加 -->
