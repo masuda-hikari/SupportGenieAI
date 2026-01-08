@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { logger } from '../utils/logger';
-import { AIContext, Message } from '../types/chat';
+import { AIContext } from '../types/chat';
 
 // システムプロンプト（カスタマーサポート向け）
 const DEFAULT_SYSTEM_PROMPT = `あなたは親切で丁寧なカスタマーサポートAIアシスタントです。
