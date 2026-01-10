@@ -8,12 +8,31 @@
 - 進捗: 初期設定完了
 
 ## 次のアクション
-**AIが実行**: カスタマーサポートチャットボット基盤実装
-- チャットボット対話エンジン（Python + OpenAI API）
-- FAQ自動応答システム
-- チケット管理API（FastAPI）
-- Web UI基盤（React/Next.js）
-- ランディングページ作成
+**AIが実行**: Phase 1 - 基盤構築（緊急対応）
+
+### 即時実行タスク（優先度順）
+1. **プロジェクト初期化**（30分）
+   - Node.js + TypeScript環境セットアップ
+   - 必要なパッケージインストール（express, socket.io, openai）
+   - ESLint/Prettier設定
+
+2. **基本APIサーバー実装**（1時間）
+   - Expressサーバー起動（server/src/index.ts）
+   - ヘルスチェックエンドポイント
+   - CORS・セキュリティ設定
+
+3. **LLM統合**（1時間）
+   - Claude API / OpenAI API連携
+   - 基本チャットエンドポイント（POST /api/chat）
+   - プロンプトテンプレート設計
+
+4. **WebSocket実装**（1時間）
+   - Socket.io設定
+   - リアルタイムチャット機能
+
+5. **データベース設定**（1時間）
+   - PostgreSQL接続
+   - テナント・会話履歴スキーマ作成
 
 ## ブロッカー（人間作業）
 - OpenAI APIキー取得
