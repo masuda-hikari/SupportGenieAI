@@ -522,6 +522,81 @@ AIは指示待ちではなく、自ら考え、最善を尽くす:
 | 2026-01-05 | O:\Dev\CLAUDE.md継承要件を追加 |
 | 2026-01-06 | AI行動原則・態度禁止・継続性観点を追加 |
 | 2026-01-06 | Orchestrator統制要件を追加 |
+| 2026-01-17 | 情報収集・SNS運営設定を追加 |
+
+---
+
+## 共有モジュール（_orchestrator）
+
+★★★ 情報収集・コンテンツ生成・セキュリティは共有モジュールを必ず使用 ★★★
+
+### モジュールパス
+```
+O:\Dev\Work\_orchestrator\lib\
+├── info_collector/  # WebFetcher, SNSCollector, MarketDataCollector
+├── content_engine/  # ContentGenerator, PostScheduler
+└── security/        # GDPRCompliance, AuditLogger
+```
+
+### 使用方法
+```python
+import sys
+sys.path.insert(0, r"O:\Dev\Work\_orchestrator")
+
+from lib.info_collector import WebFetcher, SNSCollector
+from lib.content_engine import ContentGenerator
+from lib.security import AuditLogger
+```
+
+### スキル呼び出し
+/info-collector - 情報収集ガイド参照
+
+---
+
+## 情報収集設定（CRITICAL - 必須）
+
+★★★ プロジェクト作業の50%は情報収集にリソースを割くこと ★★★
+
+### 収集対象と頻度
+| カテゴリ | キーワード | 情報源 | 頻度 | 保存先 |
+|---------|-----------|--------|------|--------|
+| 市場データ | カスタマーサポートSaaS、AIチャットボット市場、CX自動化 | 調査レポート | 月1回 | data/collected/market/ |
+| 競合情報 | Intercom, Zendesk, Freshdesk, Drift, Ada | 競合サイト | 週1回 | data/collected/competitor/ |
+| 技術動向 | RAG, LLM Customer Support, Vector Database | GitHub、公式ドキュメント | 週1回 | data/collected/tech/ |
+| SNSトレンド | #カスタマーサポート #AIチャットボット #CX改善 | X/Twitter | 日1回 | data/collected/social/ |
+| 法規制 | 消費者保護法、特定商取引法、個人情報保護法 | 官公庁サイト | 月1回 | data/collected/legal/ |
+
+### 情報品質チェックリスト
+- [ ] 一次ソースを優先したか
+- [ ] 出典URLと取得日を記録したか
+- [ ] 6ヶ月以上前のデータは再収集対象としたか
+
+---
+
+## SNS運営設定（CRITICAL - 必須）
+
+★★★ 開発だけして運営しない状態は失敗扱い ★★★
+
+### アカウント情報
+| プラットフォーム | アカウント | 目的 | 状態 |
+|-----------------|-----------|------|------|
+| X/Twitter | @SupportGenieAI | カスタマーサポート改善Tips・事例共有 | 要開設 |
+
+### 投稿スケジュール
+| 曜日 | 時間 | コンテンツタイプ |
+|------|------|-----------------|
+| 月-金 | 09:00, 18:00 | 価値提供投稿（CS効率化Tips、AI活用事例） |
+| 土日 | 12:00 | 週間まとめ |
+
+---
+
+## セキュリティ・法令対策
+
+### 必須対応項目
+| 項目 | 対応状況 |
+|------|---------|
+| プライバシーポリシー | 未 |
+| 利用規約 | 未 |
 
 <!-- LOCAL:END -->
 
