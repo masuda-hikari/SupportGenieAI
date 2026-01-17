@@ -2,12 +2,14 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AIService } from '../services/aiService';
 import { sessionService } from '../services/sessionService';
+import { getKnowledgeBaseService } from '../services/knowledgeBaseService';
 import { logger } from '../utils/logger';
-import { ChatRequest, ChatResponse } from '../types/chat';
+import { ChatRequest, ChatResponse, KnowledgeBaseResult } from '../types/chat';
 
 export const chatRouter = Router();
 
 const aiService = new AIService();
+const knowledgeBaseService = getKnowledgeBaseService();
 
 // チャットメッセージ送信エンドポイント
 chatRouter.post('/', async (req: Request, res: Response) => {
@@ -48,8 +50,26 @@ chatRouter.post('/', async (req: Request, res: Response) => {
     // ユーザーメッセージを履歴に追加
     sessionService.addMessage(session.id, 'user', message);
 
-    // AI用コンテキスト構築
+    // ナレッジベース検索（RAG）
+    let knowledgeBaseResults: KnowledgeBaseResult[] = [];
+    try {
+      knowledgeBaseResults = await knowledgeBaseService.search({
+        query: message,
+        tenantId: session.tenantId,
+        topK: 3,
+        minScore: 0.5,
+      });
+      logger.debug('Knowledge base search completed', {
+        sessionId: session.id,
+        resultsCount: knowledgeBaseResults.length,
+      });
+    } catch (kbError) {
+      logger.warn('Knowledge base search failed, continuing without RAG', { error: kbError });
+    }
+
+    // AI用コンテキスト構築（RAG結果を含む）
     const context = sessionService.buildAIContext(session);
+    context.knowledgeBaseResults = knowledgeBaseResults;
 
     // AI応答を取得
     const reply = await aiService.generateResponse(message, context);
@@ -57,8 +77,9 @@ chatRouter.post('/', async (req: Request, res: Response) => {
     // AI応答を履歴に追加
     sessionService.addMessage(session.id, 'assistant', reply);
 
-    // 信頼度計算
-    const confidence = aiService.calculateConfidence(reply, []);
+    // 信頼度計算（RAG結果のソースを使用）
+    const sources = knowledgeBaseResults.map(r => r.source);
+    const confidence = aiService.calculateConfidence(reply, sources);
 
     // エスカレーション判定
     const shouldEscalate = aiService.shouldEscalate(message, reply, confidence);
@@ -68,6 +89,7 @@ chatRouter.post('/', async (req: Request, res: Response) => {
       sessionId: session.id,
       timestamp: new Date().toISOString(),
       confidence,
+      sources: sources.length > 0 ? sources : undefined,
       escalated: shouldEscalate,
     };
 

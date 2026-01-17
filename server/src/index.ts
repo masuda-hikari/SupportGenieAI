@@ -6,6 +6,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import dotenv from 'dotenv';
 import { chatRouter } from './routes/chat';
 import { healthRouter } from './routes/health';
+import knowledgeRouter from './routes/knowledge';
 import { logger } from './utils/logger';
 
 // 環境変数読み込み
@@ -41,6 +42,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 // ルート
 app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/chat', chatRouter);
+app.use('/api/v1/knowledge', knowledgeRouter);
 
 // ルートエンドポイント
 app.get('/', (_req: Request, res: Response) => {
